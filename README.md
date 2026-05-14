@@ -9,7 +9,7 @@ The model predicts whether each residue is:
 - `M`: membrane-spanning, inside to outside
 - `N`: membrane-spanning, outside to inside
 
-The project was originally developed for a graduate bioinformatics assignment and later cleaned into a more readable code sample. The goal is to demonstrate HMM implementation, dynamic programming, log-space probability handling, and biological interpretation of model output.
+This project was originally made for my final graduate integrated bioinformatics assignment. The goal is to demonstrate HMM implementation, dynamic programming, log-space probability handling, and biological interpretation of model output. Some support files were provided as part of the coursework environment.
 
 ## Project Overview
 
@@ -140,9 +140,6 @@ However, this is still a simplified educational model. It can identify membrane-
 
 More advanced tools, such as TMHMM-style models, use richer state structures with helix cores, helix caps, loop states, and more detailed validation.
 
-## Notes
-
-This project was developed as part of a graduate bioinformatics HMM assignment and refactored into a cleaner code sample. Some support files were provided as part of the coursework environment.
 
 ## Requirements
 
