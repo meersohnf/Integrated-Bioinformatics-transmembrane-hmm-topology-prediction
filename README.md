@@ -1,151 +1,142 @@
 # Transmembrane Protein Topology Prediction with a Hidden Markov Model
 
-This repository contains a Python implementation of a discrete Hidden Markov Model (HMM) for predicting transmembrane protein topology from amino acid sequences.
+A Python implementation of a discrete Hidden Markov Model (HMM) for predicting
+whether each amino acid in a membrane protein is inside the cell, outside the
+cell, or spanning the lipid bilayer.
 
-The model predicts whether each residue is:
+This project was originally made for my final graduate integrated bioinformatics
+assignment. It was later refactored into a cleaner code sample
+to show HMM implementation, dynamic programming, log-space probability handling,
+and biological interpretation of model output.
 
-- `I`: inside / cytoplasmic
-- `O`: outside / non-cytoplasmic
-- `M`: membrane-spanning, inside to outside
-- `N`: membrane-spanning, outside to inside
+Some support files were provided as part of the coursework environment. The main
+focus of this repository is the HMM implementation and evaluation workflow.
 
-This project was originally made for my final graduate integrated bioinformatics assignment. The goal is to demonstrate HMM implementation, dynamic programming, log-space probability handling, and biological interpretation of model output. Some support files were provided as part of the coursework environment.
+## Background
 
-## Project Overview
+Membrane proteins account for a large fraction of proteins in most genomes and
+are important in transport, signaling, energy production, and drug targeting.
+Knowing the topology of a transmembrane protein helps explain which parts of the
+protein cross the membrane and which regions face the inside or outside of the
+cell.
 
-The input file contains annotated membrane protein sequences with known topology paths. The model parameters used in the final script were derived from annotated non-*E. coli* membrane proteins and then manually adjusted to enforce more biologically realistic topology.
 
-Held-out *E. coli* sequences are used for evaluation only.
+## Approach
 
-The final model uses two membrane-spanning states, `M` and `N`, instead of a single membrane state. This prevents the model from predicting membrane segments that enter and exit on the same side of the bilayer.
+### States
 
-## Main Features
+The model uses four hidden topology states:
 
-- Parses pseudo-FASTA sequence/path records
-- Estimates transition and emission probabilities from labeled data
-- Implements Viterbi decoding
-- Implements forward and backward algorithms
-- Implements posterior decoding
-- Scores known or proposed hidden paths
-- Uses log-space arithmetic to avoid numerical underflow
-- Compares predicted transmembrane paths against an all-inside baseline
+| State | Meaning |
+|---|---|
+| `I` | Inside the cell |
+| `O` | Outside the cell |
+| `M` | Membrane-spanning, inside to outside |
+| `N` | Membrane-spanning, outside to inside |
 
-## Repository Contents
+Separating membrane crossings into `M` and `N` helps enforce a biologically
+important constraint: a predicted transmembrane segment should enter and exit
+on opposite sides of the bilayer. Without this distinction, the model can
+generate topologically impossible paths.
+
+### Model Source and Evaluation
+
+Transition and emission probabilities were derived from annotated non-*E. coli*
+membrane proteins. The *E. coli* sequences are held out from model construction
+and used only for evaluation.
+
+The learned probabilities were then manually adjusted to zero out forbidden
+transitions, such as direct `I -> O` movement or invalid membrane-state switches.
+The probability mass from those forbidden transitions was redistributed to the
+topologically valid alternative.
+
+### Decoding
+
+Two decoding strategies are applied to each evaluation sequence:
+
+- **Viterbi decoding** finds the single globally most probable state path using
+  dynamic programming.
+- **Posterior decoding** selects the most probable state at each position by
+  combining the forward and backward algorithms.
+
+These two methods can produce different paths because Viterbi optimizes the
+whole path, while posterior decoding optimizes each position independently.
+
+### Null Comparison
+
+Each sequence is also scored against an all-inside baseline path. The log-odds
+ratio between the Viterbi path and this baseline measures how much more
+consistent the sequence is with a transmembrane topology than with a fully
+intracellular protein.
+
+### Numerical Stability
+
+Protein sequences can be hundreds of residues long. Multiplying many small
+transition and emission probabilities can cause floating-point underflow.
+
+This project uses a `LogFloat` class to keep probability calculations in log
+space while still allowing readable arithmetic operations in the HMM methods.
+
+## Files
 
 | File | Purpose |
 |---|---|
-| `transmembrane_hmm.py` | Main HMM implementation |
-| `FastA_V2.py` | FASTA-style parser |
-| `log_float.py` | Log-space probability helper |
-| `160_membrane_prots.txt` | Annotated protein sequences |
-
-## Methods Implemented
-
-The `HMM` class includes the following methods:
-
-### `learn(seqs, paths)`
-
-Estimates transition and emission probabilities from paired observed sequences and known hidden state paths.
-
-### `evaluate(path)`
-
-Computes the joint probability of an observed sequence and a specified hidden state path.
-
-### `forward()`
-
-Computes the total probability of the observed sequence summed over all possible hidden paths.
-
-### `backward()`
-
-Computes the same total sequence probability using the backward dynamic programming formulation.
-
-### `posterior()`
-
-Uses the forward and backward tables to select the most probable state at each sequence position.
-
-### `viterbi()`
-
-Finds the single most probable hidden state path for the observed sequence.
-
-### `get_sequences_and_paths(filename)`
-
-Reads the input file and separates each record into an annotation, amino acid sequence, and known topology path.
-
-## Why Log-Space Arithmetic Is Used
-
-Protein sequences can be hundreds of residues long. Multiplying many small transition and emission probabilities can quickly underflow in standard floating-point arithmetic.
-
-This project uses the provided `LogFloat` class to keep probability calculations numerically stable. `LogFloat` stores values internally in log space while still supporting readable arithmetic operations such as multiplication, division, addition, and comparison.
-
-## Model Design
-
-The final topology model uses separate membrane-crossing states:
-
-- `M`: inside → membrane → outside
-- `N`: outside → membrane → inside
-
-Forbidden transitions are assigned probability zero. For example, the model does not allow a direct `I → O` transition or a membrane segment that exits on the same side it entered.
-
-This adjustment makes the predicted paths more biologically realistic than the earlier one-membrane-state model.
+| `transmembrane_hmm.py` | Main HMM implementation and analysis script |
+| `FastA_V2.py` | FASTA parser |
+| `log_float.py` | Log-space arithmetic class |
+| `160_membrane_prots.txt` | Annotated protein sequences and topology paths |
 
 ## Usage
 
-Place all required files in the same folder:
-
-```text
-transmembrane_hmm.py
-FastA_V2.py
-log_float.py
-160_membrane_prots.txt
-```
-
-Then run:
+Place all required files in the same folder, then run:
 
 ```bash
 python transmembrane_hmm.py
 ```
 
-The script uses relative file paths, so no hard-coded system paths are required.
+No external dependencies beyond the Python standard library are required.
 
-## Example Output
+## Output
 
-The script evaluates held-out *E. coli* sequences. For each sequence, it reports the known topology path, Viterbi-decoded path, posterior-decoded path, all-inside baseline path, and log-odds comparison.
+For each held-out *E. coli* sequence, the script prints the known topology path,
+Viterbi-decoded path, posterior-decoded path, baseline all-inside path, and the
+log-odds ratio against that baseline.
+
+Example output:
 
 ```text
->EXBD_ECOLI
-Sequence length: 141 amino acids
-Actual:    SIIIIIIIIIIIIIMMMMMMMMMMMMMMMMMMMMMOOOOOOOO...
-Viterbi:   SOOOOOOOOOOOOONNNNNNNNNNNNNNNNNNNNIIIIIIII...
-Posterior: SOOOOOOOOOOOOONNNNNNNNNNNNNIIIIIIIIIIIIIII...
-Baseline:  SIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII...
+>ATPL_ECOLI
+Sequence length: 79 amino acids
+Actual:    SOOOOOOOOOOMMMMMMMMMMMMMMMMMMMMMIIIIIIIIIIIIIIIIIIIIIMMMMMMMMMMMMMMMMMMMMMOOOOOO
+Viterbi:   SOOOOOOONNNNNNNNNNNNNNNNNNNNNNNNNNIIIIIIIIIIIIIIIIIIIMMMMMMMMMMMMMMMMMMMMMMMMMMM
+Posterior: SOOOOOOONNNNNNNNNNNNNNNNNNNNNNNNNIIIIIIIIIIIIIIIIIIIIMMMMMMMMMMMMMMMMMMMMMMMMMMM
+Baseline:  SIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 
-  Viterbi log-probability:           -412.4743
-  Baseline log-probability:          -416.5502
-  Log-odds ratio (Viterbi/baseline): 4.0759
-  Odds ratio (real space):           59.14
+  Viterbi log-probability:           -220.2458
+  Baseline log-probability:          -233.4767
+  Log-odds ratio (Viterbi/baseline): 13.2308
+  Odds ratio (real space):           557278.00
 ```
 
-A positive log-odds ratio means the Viterbi-decoded transmembrane path explains the sequence better than forcing the whole protein to be intracellular.
+This example shows that the Viterbi-decoded membrane topology explains the
+sequence much better than the all-inside baseline path.
 
 ## Interpretation
 
-The final model improves one major issue from the simpler model: membrane segments are less likely to enter and exit on the same side of the bilayer.
+The final model improves one of the main issues from the simpler one-membrane
+state model: membrane segments are less likely to enter and exit on the same
+side of the bilayer.
 
-However, this is still a simplified educational model. It can identify membrane-like regions, but it may still struggle with:
+However, this is still a simplified educational model. It can identify
+membrane-like regions, but it may still struggle with:
 
 - choosing the correct inside/outside orientation
 - identifying exact membrane boundaries
 - producing clean posterior paths
 - modeling realistic transmembrane helix lengths
 
-More advanced tools, such as TMHMM-style models, use richer state structures with helix cores, helix caps, loop states, and more detailed validation.
-
-
-## Requirements
-
-No external Python packages are required.
-
-The code uses only the Python standard library plus local support files included in the repository.
+More advanced tools, such as TMHMM-style models, use richer state structures
+with helix cores, helix caps, loop states, and more detailed validation.
 
 ## Author
 
